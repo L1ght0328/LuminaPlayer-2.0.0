@@ -1,0 +1,19 @@
+# Python temporários
+__pycache__/
+*.py[cod]
+
+# Ambientes virtuais
+venv/
+.venv/
+
+# Builds e distribuição
+build/
+dist/
+*.spec
+
+# Logs
+*.log
+
+# Banco de dados local
+*.db
+*.sqlite3
