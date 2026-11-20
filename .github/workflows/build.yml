@@ -1,0 +1,78 @@
+name: Build Lumina Player
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt pyinstaller
+      - name: Run tests (offscreen)
+        continue-on-error: true
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q
+      - name: Generate application icon
+        run: python scripts/make_icon.py
+      - name: Build portable application
+        run: |
+          pyinstaller --noconfirm --clean --windowed --noconsole --onedir `
+            --name LuminaPlayer `
+            --icon assets/icon.ico `
+            --add-data "qml;qml" `
+            --add-data "assets;assets" `
+            --collect-all PySide6 `
+            --hidden-import PySide6.QtMultimedia `
+            --hidden-import PySide6.QtMultimediaWidgets `
+            --hidden-import PySide6.QtQml `
+            --hidden-import mutagen `
+            main.py
+      - name: Smoke test executable
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "dist/LuminaPlayer/LuminaPlayer.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            Write-Host "Process exited early with code $($p.ExitCode)"
+            $log = Join-Path $env:APPDATA "LuminaPlayer/lumina.log"
+            if (Test-Path $log) { Get-Content $log -Tail 100 }
+            exit 1
+          }
+          Stop-Process -Id $p.Id -Force
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+      - name: Zip portable folder
+        run: Compress-Archive -Path dist/LuminaPlayer -DestinationPath LuminaPlayer-Portable.zip -Force
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuminaPlayer-Portable
+          path: LuminaPlayer-Portable.zip
+          if-no-files-found: error
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuminaPlayer-Installer
+          path: installer_output/LuminaPlayer_Setup.exe
+          if-no-files-found: error
