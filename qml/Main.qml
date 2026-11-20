@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "."
+import "pages"
 ApplicationWindow{
  id:win;visible:true;width:1366;height:768;minimumWidth:960;minimumHeight:600
  title:"Lumina Player";color:Theme.background
